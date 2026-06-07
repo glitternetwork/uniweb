@@ -4,6 +4,17 @@ description: Help developers safely add uniweb payments to an app. Use when the 
 argument-hint: "[what you want to do]"
 ---
 
+<!--
+  This file is the canonical SKILL.md. The Chinese mirror at
+  skills/uniweb/skill_zh.md and the public Claude Code plugin repo at
+  https://github.com/glitternetwork/uniweb must stay in sync with it.
+
+  After editing:
+    pnpm verify:skill          # checks the in-repo mirror
+    pnpm verify:skill -- --fix # rewrites the mirror from this file
+    pnpm sync:skill            # pushes this file to glitternetwork/uniweb
+-->
+
 # uniweb Payment Integrations
 
 You are helping a developer integrate uniweb into an existing app. Your goal is to choose the lightest correct payment path, generate server-safe code, and make fulfillment depend on verified webhooks instead of browser redirects.
