@@ -37,7 +37,7 @@ When the user says "invoice", use a Payment Link for simple invoice-style collec
 
 1. Never put `sk_live_` in deployed code or browser code. It is a full key for trusted local/admin use.
 2. For backends, create and use `sk_server_` keys with the smallest scopes needed.
-3. Prefer `@uniweb/sdk` over hand-written `fetch()` for server integrations.
+3. Prefer `@uniwebpay/sdk` over hand-written `fetch()` for server integrations.
 4. The SDK must run only on the server: Node.js, Cloudflare Workers, Deno, or Bun. Do not import it in browser bundles.
 5. Fulfill orders and grant access only after a verified webhook. Treat `successUrl` as UX only.
 6. Amounts are integer cents/minor units. Default currency is `SGD`.
@@ -49,7 +49,7 @@ Server keys are scope-based. Default server keys can create products, prices, ch
 Use this for a fixed amount with no backend.
 
 ```bash
-npm install -g @uniweb/cli
+npm install -g @uniwebpay/cli
 uniweb wallet create
 uniweb link create 1000 -c SGD -n "My Product" --methods card,wechat,alipay,paynow
 # returns https://vibecash.dev/p/plink_xxx
@@ -109,11 +109,11 @@ uniweb key create -t server -n "Checkout Backend"
 Install and use the SDK on the backend:
 
 ```bash
-npm install @uniweb/sdk
+npm install @uniwebpay/sdk
 ```
 
 ```typescript
-import Uniweb from '@uniweb/sdk';
+import Uniweb from '@uniwebpay/sdk';
 
 const vc = new Uniweb(process.env.VIBECASH_SERVER_KEY!);
 
@@ -176,7 +176,7 @@ Use the SDK verifier with the raw request body:
 
 ```typescript
 import express from 'express';
-import { verifyWebhook } from '@uniweb/sdk';
+import { verifyWebhook } from '@uniwebpay/sdk';
 
 app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   try {
@@ -314,7 +314,7 @@ const vc = new Uniweb(process.env.VIBECASH_SERVER_KEY!, {
 ## CLI Reference
 
 ```bash
-npm install -g @uniweb/cli
+npm install -g @uniwebpay/cli
 
 # Wallet and dashboard claim
 uniweb wallet create
