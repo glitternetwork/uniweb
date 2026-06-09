@@ -1,0 +1,4 @@
+interface:
+  display_name: "uniweb Payments"
+  short_description: "Add uniweb checkout, links, billing, and webhooks"
+  default_prompt: "Use $uniweb to add a secure checkout flow and verified webhook fulfillment to my app."

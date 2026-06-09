@@ -1,25 +1,11 @@
 ---
 name: uniweb
 description: Help developers safely add uniweb payments to an app. Use when the user asks to accept card, WeChat Pay, Alipay, or PayNow payments; create payment links; add checkout, subscriptions, billing, or invoice-style payment collection; handle webhooks; or use the uniweb CLI or TypeScript SDK.
-argument-hint: "[what you want to do]"
 ---
-
-<!--
-  This file is the canonical SKILL.md. The Chinese mirror at
-  skills/uniweb/skill_zh.md and the public Claude Code plugin repo at
-  https://github.com/glitternetwork/uniweb must stay in sync with it.
-
-  After editing:
-    pnpm verify:skill          # checks the in-repo mirror
-    pnpm verify:skill -- --fix # rewrites the mirror from this file
-    pnpm sync:skill            # pushes this file to glitternetwork/uniweb
--->
 
 # uniweb Payment Integrations
 
 You are helping a developer integrate uniweb into an existing app. Your goal is to choose the lightest correct payment path, generate server-safe code, and make fulfillment depend on verified webhooks instead of browser redirects.
-
-**User request:** $ARGUMENTS
 
 Before editing an app, inspect its framework, routing style, package manager, and environment variable conventions. Keep secrets in server-side environment variables and match the project's existing patterns.
 
@@ -42,7 +28,7 @@ When the user says "invoice", use a Payment Link for simple invoice-style collec
 5. Fulfill orders and grant access only after a verified webhook. Treat `successUrl` as UX only.
 6. Amounts are integer cents/minor units. Default currency is `SGD`.
 
-Server keys are scope-based. Default server keys can create products, prices, checkout sessions, customers, and payment links, and can read payments/subscriptions/refunds. Extra scopes such as `payments.write`, `refunds.create`, `payouts.create`, `kyc.manage`, or `bank_accounts.manage` should be granted only when the backend truly needs those money-moving or account-management actions.
+Server keys are scope-based. Default server key scopes are `products.read`, `products.write`, `prices.read`, `prices.write`, `checkout.create`, `payments.read`, `customers.read`, `customers.write`, `subscriptions.read`, `payment_links.read`, `payment_links.write`, and `refunds.read`. Extra scopes such as `payments.write`, `subscriptions.write`, `refunds.create`, `wallet.update`, `payouts.create`, `kyc.manage`, or `bank_accounts.manage` should be granted only when the backend truly needs those write, money-moving, or account-management actions.
 
 ## Path A: Payment Link
 
@@ -65,6 +51,12 @@ Optional fulfillment notification:
 uniweb webhook set https://yoursite.com/webhook
 ```
 
+Notes:
+
+- Payment Links only support one-time payments. For subscriptions, create a recurring Price and share its `/buy/price_xxx` URL.
+- If `--methods` is omitted, defaults depend on amount and currency: SGD amounts under `10` minor units use WeChat/Alipay/PayNow; SGD amounts `>= 10` use card/WeChat/Alipay/PayNow; non-SGD amounts under `10` use WeChat/Alipay; non-SGD amounts `>= 10` default to card.
+- PayNow is rejected for non-SGD links. Card is rejected below the `10` minor-unit minimum.
+
 ## Path B: Product + Price URL
 
 Use this for a known product, pricing page, or subscription plan.
@@ -85,7 +77,7 @@ Notes:
 - Subscriptions support card payments only. Ignore WeChat Pay, Alipay, and PayNow for subscription checkout.
 - Customer email is collected at checkout; uniweb creates or reuses the Customer record.
 - Subscription statuses: `trialing`, `active`, `past_due`, `unpaid`, `canceled`.
-- Renewal retries follow 1 hour, 1 day, 3 days, 7 days, then final unpaid handling.
+- Renewal dunning retries follow 1 hour, 1 day, 3 days, and 7 days between attempts; after all allowed attempts are exhausted, the subscription becomes `unpaid`.
 
 Subscription management from a trusted machine:
 
@@ -223,7 +215,8 @@ Webhook rules:
 - Do not use JSON body parsing before verification; verification needs the exact raw body.
 - Enforce idempotency using `event.id`, payment id, or your `metadata.orderId`.
 - Before fulfillment, check expected amount, currency, customer/order metadata, and current order state.
-- Return a 2xx only after durable processing. uniweb retries failed deliveries.
+- Return a 2xx only after durable processing. uniweb sends an immediate delivery attempt, retries failed deliveries after 5 minutes, 30 minutes, 2 hours, and 12 hours, and marks the event failed after 6 total attempts.
+- Delivery uses `uniweb-Signature: t=<unix>,v1=<hmac-sha256-hex>`, `uniweb-Event-Id`, and `uniweb-Timestamp` headers. Webhook delivery has a 10 second timeout and does not follow redirects.
 - Per-link webhook overrides per-product webhook, which overrides the wallet webhook. The signing secret is wallet-level.
 
 Events:
@@ -240,7 +233,7 @@ account.kyc.approved, account.kyc.rejected
 
 ## SDK Surface
 
-```typescript
+```text
 await vc.products.create({ name, description?, webhookUrl?, metadata? });
 await vc.products.list({ limit?, startingAfter? });
 await vc.products.get(id);
@@ -258,15 +251,15 @@ await vc.checkout.create({ mode, lineItems, successUrl?, cancelUrl?, customerEma
 await vc.checkout.list({ limit?, startingAfter? });
 await vc.checkout.get(id);
 
-await vc.payments.create({ checkoutSessionId, paymentMethod, ... });   // requires payments.write
+await vc.payments.create({ amount, currency, customerId?, metadata? }); // requires payments.write
 await vc.payments.list({ status?, customerId?, limit?, startingAfter? });
 await vc.payments.get(id);
 await vc.payments.sync(id);                                            // requires payments.write
 await vc.payments.void(id);                                            // requires refunds.create
 for await (const p of vc.payments.listAll({ status?, customerId? })) {}
 
-await vc.refunds.create({ paymentId, amount?, reason?, offlineRefundFlag?, metadata? }); // requires refunds.create
-await vc.refunds.get(id, { gateway? });                                                  // gateway:true → gateway enquiry
+await vc.refunds.create({ paymentId, amount?, reason?, offlineRefundFlag? }); // requires refunds.create
+await vc.refunds.get(id, { gateway? });                                       // gateway:true -> gateway enquiry
 
 await vc.customers.create({ email, name?, metadata? });
 await vc.customers.list({ email?, limit?, startingAfter? });
@@ -275,7 +268,7 @@ await vc.customers.update(id, { email?, name?, metadata? });
 await vc.customers.del(id);
 for await (const c of vc.customers.listAll({ email? })) {}
 
-await vc.subscriptions.create({ customerId, priceId, ... });
+await vc.subscriptions.create({ customerId, priceId, paymentMethodId?, trialPeriodDays?, metadata? });
 await vc.subscriptions.list({ customerId?, status?, limit?, startingAfter? });
 await vc.subscriptions.get(id);
 await vc.subscriptions.update(id, { cancelAtPeriodEnd? });
@@ -292,10 +285,10 @@ for await (const l of vc.links.listAll()) {}
 
 // Wallet-level webhook configuration. The signing secret returned by set/rollSecret
 // is the only place you can read whsec_xxx — store it before the call returns.
-await vc.webhooks.set(url);          // returns { url, secret }
+await vc.webhooks.set(url);          // returns wallet webhook data, including webhookSecret when available
 await vc.webhooks.info();            // current wallet, url, hasSecret
 await vc.webhooks.remove();
-await vc.webhooks.rollSecret();      // returns { url, secret } — invalidates the previous secret
+await vc.webhooks.rollSecret();      // returns webhookSecret when available; invalidates the previous secret
 ```
 
 The SDK constructor reads from `https://apiskill.uniwebpay.com` (production API edge) and `https://vibecash.dev` (production pay/checkout host) by default. Override only when the deployment instructs it (staging, local dev) — wrong overrides silently route real keys to the wrong environment:
@@ -396,7 +389,7 @@ uniweb payout cancel <id>
   - `wechat` — `CNY` and a small set of cross-border currencies; check before using anything other than `CNY`.
   - `alipay` — primarily `CNY` plus Alipay Cross-border supported currencies; same caveat as wechat.
 - Card minimum: `10` minor units (e.g. `0.10 SGD`, `0.10 USD`). For zero-decimal currencies (e.g. `JPY`, `IDR`) the minor unit IS the major unit, so `10 JPY` minimum applies — confirm with the gateway when listing such currencies.
-- Payment Links and Product/Price URLs are reusable and permanent.
+- Payment Links and Product/Price URLs are reusable and permanent. Payment Links are one-time only; recurring billing uses Product/Price URLs.
 - Checkout Sessions are one-time and expire after 24 hours.
 - Prices are effectively immutable for amount/currency; create a new price instead of editing the old one.
 - KYC is not required to accept payments, but is required before payouts.
@@ -407,10 +400,10 @@ uniweb payout cancel <id>
 trialing → active                   (trial ends with successful charge)
 active   → past_due                 (renewal failed; retry schedule below)
 past_due → active                   (a retry succeeded)
-past_due → unpaid                   (all retries exhausted; access usually paused)
-unpaid   → canceled                 (grace window over; subscription terminated)
+past_due → unpaid                   (all dunning attempts exhausted; access usually paused)
 *        → canceled                 (`subscriptions.cancel` ends immediately)
+active   → canceled                 (`pause` cancels at the current period end when the renewal cron reaches it)
 *        → cancelAtPeriodEnd=true   (`pause` schedules cancel at current period end; `resume` undoes)
 ```
 
-Renewal retry attempts: `1h`, `1d`, `3d`, `7d`. After the 4th failure the subscription transitions to `unpaid`; if no recovery occurs in the grace window it transitions to `canceled`. Listen on `subscription.past_due` / `subscription.unpaid` / `subscription.canceled` for access changes.
+Renewal dunning uses `MAX_DUNNING_ATTEMPTS = 5` with retry delays of `1h`, `1d`, `3d`, and `7d` between attempts; when the next attempt would exceed the maximum, the subscription transitions to `unpaid`. The code does not automatically cancel an `unpaid` subscription after a grace window. Listen on `subscription.past_due` / `subscription.unpaid` / `subscription.canceled` for access changes.

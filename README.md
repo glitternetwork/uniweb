@@ -1,36 +1,35 @@
-# uniweb Skill for Claude Code
+# uniweb Skill
 
-AI-powered integration assistant for the uniweb payment platform. Instead of reading docs, let Claude write your integration code.
+AI-powered integration assistant for the uniweb payment platform. Instead of reading docs, let your coding agent write the integration code.
 
 ## Install
 
-### Option 1: Use as plugin (recommended)
+### Claude Code
 
 ```bash
 git clone https://github.com/glitternetwork/uniweb.git
-claude --plugin-dir ./uniweb
+mkdir -p ~/.claude/skills/uniweb
+cp uniweb/skills/uniweb/SKILL.md ~/.claude/skills/uniweb/SKILL.md
 ```
 
-### Option 2: Copy to personal skills
+Then ask Claude Code to use the `uniweb` skill:
+
+```
+Use the uniweb skill to add a checkout button to my Express app.
+```
+
+### Codex
 
 ```bash
-mkdir -p ~/.claude/skills/uniweb
-cp skills/uniweb/SKILL.md ~/.claude/skills/uniweb/SKILL.md
+git clone https://github.com/glitternetwork/uniweb.git
+mkdir -p ~/.codex/skills
+cp -R uniweb/skills/uniweb ~/.codex/skills/uniweb
 ```
 
-### Option 3: Copy from docs
+Then invoke the skill explicitly:
 
-Visit [vibecash.dev/docs/skill](https://vibecash.dev/docs/skill) and copy the SKILL.md content directly.
-
-## Usage
-
-In Claude Code, use the `/uniweb` command:
-
-```
-/uniweb "add a checkout button to my Express app"
-/uniweb "set up subscription billing with a 14-day trial"
-/uniweb "handle webhook events for payment and subscription"
-/uniweb "add WeChat Pay and Alipay to my checkout"
+```text
+Use $uniweb to add a checkout button to my Express app.
 ```
 
 ## What it can do
@@ -47,7 +46,7 @@ In Claude Code, use the `/uniweb` command:
 You need a uniweb merchant wallet:
 
 ```bash
-npm install -g uniweb
+npm install -g @uniwebpay/cli
 uniweb wallet create
 ```
 
